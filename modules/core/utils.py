@@ -10,6 +10,7 @@ import json
 import re
 import secrets
 import string
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -54,7 +55,8 @@ _DNS_PROVIDER_CREDENTIALS = {
     'porkbun': ['api_key', 'secret_key'],
     'godaddy': ['api_key', 'secret'],
     'he-ddns': ['username', 'password'],
-    'dynudns': ['token']
+    'dynudns': ['token'],
+    'abion': ['api_key'],  # api_url is optional, defaults to https://api.abion.com/
 }
 
 # A mapping of multi-provider names to their certbot plugin .ini filename.
@@ -62,7 +64,8 @@ _MULTI_PROVIDER_PLUGIN_FILES = {
     'vultr': 'vultr.ini', 'dnsmadeeasy': 'dnsmadeeasy.ini', 'nsone': 'nsone.ini',
     'rfc2136': 'rfc2136.ini', 'hetzner': 'hetzner.ini', 'hetzner-cloud': 'hetzner-cloud.ini',
     'porkbun': 'porkbun.ini', 'godaddy': 'godaddy.ini', 'he-ddns': 'he-ddns.ini',
-    'dynudns': 'dynudns.ini'
+    'dynudns': 'dynudns.ini',
+    'abion': 'abion.ini',
 }
 
 # A data-driven template for building multi-provider config files.
@@ -84,6 +87,10 @@ _MULTI_PROVIDER_TEMPLATE_MAP = {
     'godaddy': {'dns_godaddy_key': 'api_key', 'dns_godaddy_secret': 'secret'},
     'he-ddns': {'dns_he_ddns_username': 'username', 'dns_he_ddns_password': 'password'},
     'dynudns': {'dns_dynudns_token': 'token'},
+    'abion': {
+        'dns_abion_api_key': 'api_key',
+        'dns_abion_api_url': ('api_url', 'https://api.abion.com/'),
+    },
 }
 
 
@@ -264,14 +271,16 @@ def generate_secure_token(length: int = 40) -> str:
 # =============================================
 
 def _create_config_file(plugin_name: str, content: str) -> Path:
-    """Generic helper to create a config file in the right directory."""
-    config_dir = Path("letsencrypt/config")
-    config_dir.mkdir(parents=True, exist_ok=True)
-    
+    """Generic helper to create a temporary config file for certbot plugins.
+
+    Each call creates a fresh isolated temp directory so concurrent certificate
+    operations never share or overwrite each other's credentials. The caller is
+    responsible for deleting the file and its parent directory after use.
+    """
+    config_dir = Path(tempfile.mkdtemp(prefix="certmate_dns_"))
     config_file = config_dir / f"{plugin_name}.ini"
     with open(config_file, 'w', encoding='utf-8') as f:
         f.write(content)
-    
     config_file.chmod(0o600)
     return config_file
 
@@ -297,16 +306,19 @@ def create_azure_config(subscription_id: str, resource_group: str, tenant_id: st
 
 def create_google_config(project_id: str, service_account_key: str) -> Path:
     """Create Google Cloud DNS credentials file."""
-    config_dir = Path("letsencrypt/config")
-    config_dir.mkdir(parents=True, exist_ok=True)
-    
+    config_dir = Path(tempfile.mkdtemp(prefix="certmate_dns_"))
+
     sa_file = config_dir / "google-service-account.json"
     with open(sa_file, 'w', encoding='utf-8') as f:
         f.write(service_account_key)
     sa_file.chmod(0o600)
-    
+
+    config_file = config_dir / "google.ini"
     content = f"dns_google_project_id = {project_id}\ndns_google_service_account_key = {str(sa_file)}\n"
-    return _create_config_file("google", content)
+    with open(config_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+    config_file.chmod(0o600)
+    return config_file
 
 def create_powerdns_config(api_url: str, api_key: str) -> Path:
     """Create PowerDNS credentials file."""
@@ -349,6 +361,16 @@ def create_arvancloud_config(api_key: str) -> Path:
 def create_infomaniak_config(api_token: str) -> Path:
     """Create Infomaniak DNS credentials file."""
     return _create_config_file("infomaniak", f"dns_infomaniak_token = {api_token}\n")
+
+def create_abion_config(api_key: str, api_url: str = "https://api.abion.com/", account_id: str = "") -> Path:
+    """Create Abion (Ports Management) DNS credentials file.
+    
+    When account_id is provided, creates a per-account file (e.g. abion-tenant_a.ini)
+    so that multiple accounts can coexist and renewals use the correct credentials.
+    """
+    suffix = f"-{account_id}" if account_id else ""
+    content = f"dns_abion_api_key = {api_key}\ndns_abion_api_url = {api_url}\n"
+    return _create_config_file(f"abion{suffix}", content)
 
 def create_acme_dns_config(api_url: str, username: str, password: str, subdomain: str) -> Path:
     """Create ACME-DNS credentials file."""

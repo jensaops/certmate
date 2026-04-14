@@ -318,6 +318,11 @@ class CertificateManager:
                     if not dns_config:
                         raise ValueError(f"DNS provider '{dns_provider}' account '{account_id or 'default'}' not configured")
 
+                    # Inject account_id into config so strategies can create
+                    # per-account credential files (e.g. abion-tenant_a.ini)
+                    dns_config = dict(dns_config)
+                    dns_config['account_id'] = used_account_id
+
                     logger.info(f"Using DNS provider: {dns_provider} with account: {used_account_id}")
 
                 # Get Strategy
@@ -526,11 +531,13 @@ class CertificateManager:
             raise
         finally:
             domain_lock.release()
-            # Always clean up credential files (even on failure)
+            # Always clean up the temp credentials directory after use.
+            # Credentials are reconstructed fresh on every run so nothing
+            # needs to persist between operations.
             if credentials_file:
                 try:
-                    os.unlink(credentials_file)
-                except (FileNotFoundError, OSError):
+                    shutil.rmtree(credentials_file.parent, ignore_errors=True)
+                except Exception:
                     pass
             # Clean up CA bundle temp file if created
             ca_bundle = ca_extra_env.get('REQUESTS_CA_BUNDLE')
@@ -541,42 +548,103 @@ class CertificateManager:
                     pass
 
     def renew_certificate(self, domain):
-        """Renew a certificate"""
+        """Renew a certificate.
+
+        Credentials are reconstructed fresh from settings on every renewal
+        rather than relying on a persisted credentials file on disk. This
+        ensures that rotated API keys are picked up automatically and that
+        no credentials are left on disk between operations.
+        """
         domain_lock = self._get_domain_lock(domain)
         if not domain_lock.acquire(blocking=False):
             raise RuntimeError(f"A certificate operation for {domain} is already in progress")
+
+        credentials_file = None
+        process_env = os.environ.copy()
+
         try:
-            # Use the same config/work/log directories as during creation
             cert_dir = self.cert_dir
             domain_dir = cert_dir / domain
             if not domain_dir.exists() or not (domain_dir / 'cert.pem').exists():
                 raise FileNotFoundError(f"No certificate found for domain: {domain}")
             work_dir = domain_dir / 'work'
             logs_dir = domain_dir / 'logs'
-            
+
+            # Read metadata to get dns_provider and account_id used at creation
+            dns_provider = None
+            account_id = None
+            metadata_file = domain_dir / 'metadata.json'
+            if metadata_file.exists():
+                try:
+                    import json
+                    with open(metadata_file, 'r') as f:
+                        metadata = json.load(f)
+                    dns_provider = metadata.get('dns_provider')
+                    account_id = metadata.get('account_id')
+                    logger.debug(f"Renewal metadata for {domain}: provider={dns_provider} account={account_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to read metadata for {domain}: {e}")
+
+            # Fall back to settings default if metadata missing
+            if not dns_provider:
+                settings = self.settings_manager.load_settings()
+                dns_provider = self.settings_manager.get_domain_dns_provider(domain, settings)
+
             cmd = [
                 'certbot', 'renew',
                 '--cert-name', domain,
                 '--quiet',
                 '--config-dir', str(domain_dir),
                 '--work-dir', str(work_dir),
-                '--logs-dir', str(logs_dir)
+                '--logs-dir', str(logs_dir),
             ]
-            result = self.shell_executor.run(cmd, capture_output=True, text=True)
-            
+
+            # Reconstruct credentials for DNS-01 providers
+            if dns_provider and dns_provider != 'http-01':
+                try:
+                    dns_config, used_account_id = self._get_dns_config(dns_provider, account_id)
+                    if dns_config:
+                        dns_config = dict(dns_config)
+                        dns_config['account_id'] = used_account_id
+
+                        strategy = DNSStrategyFactory.get_strategy(dns_provider)
+                        strategy.prepare_environment(process_env, dns_config)
+                        credentials_file = strategy.create_config_file(dns_config)
+
+                        if credentials_file:
+                            strategy.configure_certbot_arguments(cmd, credentials_file)
+                            logger.info(f"Renewal using provider={dns_provider} account={used_account_id}")
+                    else:
+                        logger.warning(
+                            f"Could not resolve credentials for {domain} "
+                            f"(provider={dns_provider} account={account_id}) — "
+                            f"falling back to stored renewal config"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to reconstruct credentials for {domain}: {e} — "
+                        f"falling back to stored renewal config"
+                    )
+
+            result = self.shell_executor.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                env=process_env,
+            )
+
             if result.returncode == 0:
-                # Copy renewed certificates from the correct live directory
+                # Copy renewed certificates from the live directory
                 src_dir = domain_dir / 'live' / domain
                 dest_dir = domain_dir
-                
+
                 for file_name in CERTIFICATE_FILES:
                     src_file = src_dir / file_name
                     dest_file = dest_dir / file_name
                     if src_file.exists():
                         self._atomic_binary_copy(src_file, dest_file)
-                
+
                 # Update metadata with renewal timestamp
-                metadata_file = dest_dir / 'metadata.json'
                 if metadata_file.exists():
                     try:
                         import json
@@ -587,7 +655,7 @@ class CertificateManager:
                         logger.info(f"Updated renewal timestamp in metadata for {domain}")
                     except Exception as e:
                         logger.warning(f"Failed to update metadata for {domain}: {e}")
-                
+
                 logger.info(f"Certificate renewed successfully for {domain}")
                 return {
                     'success': True,
@@ -598,12 +666,19 @@ class CertificateManager:
                 error_msg = result.stderr or "Certificate not found"
                 logger.error(f"Certificate renewal failed for {domain}: {error_msg}")
                 raise RuntimeError(f"Renewal failed: {error_msg}")
+
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Exception during certificate renewal for {domain}: {error_msg}")
             raise RuntimeError(f"Exception: {error_msg}")
         finally:
             domain_lock.release()
+            # Always clean up the reconstructed temp credentials directory.
+            if credentials_file:
+                try:
+                    shutil.rmtree(credentials_file.parent, ignore_errors=True)
+                except Exception:
+                    pass
 
     def check_renewals(self):
         """Check and renew certificates that are about to expire"""
