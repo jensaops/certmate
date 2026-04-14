@@ -23,12 +23,13 @@ logger = logging.getLogger(__name__)
 class CertificateManager:
     """Class to handle certificate operations"""
     
-    def __init__(self, cert_dir, settings_manager, dns_manager, storage_manager=None, ca_manager=None, shell_executor=None):
+    def __init__(self, cert_dir, settings_manager, dns_manager, storage_manager=None, ca_manager=None, shell_executor=None, audit_logger=None):
         self.cert_dir = Path(cert_dir)
         self.settings_manager = settings_manager
         self.dns_manager = dns_manager
         self.storage_manager = storage_manager
         self.ca_manager = ca_manager
+        self.audit_logger = audit_logger
         self.shell_executor = shell_executor or ShellExecutor()
         # Per-domain locks to prevent concurrent create/renew on the same domain
         self._domain_locks: dict[str, threading.Lock] = {}
@@ -512,7 +513,15 @@ class CertificateManager:
             
             duration = time.time() - start_time
             logger.info(f"Certificate created successfully for {domain} in {duration:.2f} seconds")
-            
+
+            if self.audit_logger:
+                self.audit_logger.log_certificate_created(
+                    identifier=domain,
+                    common_name=domain,
+                    usage='server',
+                    user='system'
+                )
+
             return {
                 'success': True,
                 'domain': domain,
@@ -520,14 +529,30 @@ class CertificateManager:
                 'duration': duration,
                 'staging': staging
             }
-            
+
         except subprocess.TimeoutExpired:
             logger.error(f"Certificate creation timeout for {domain}")
+            if self.audit_logger:
+                self.audit_logger.log_error(
+                    operation='create',
+                    resource_type='certificate',
+                    resource_id=domain,
+                    error_message='Certificate creation timed out',
+                    user='system'
+                )
             raise RuntimeError("Certificate creation timed out")
-            
+
         except Exception as e:
             duration = time.time() - start_time
             logger.error(f"Certificate creation failed for {domain}: {str(e)} (duration: {duration:.2f}s)")
+            if self.audit_logger:
+                self.audit_logger.log_error(
+                    operation='create',
+                    resource_type='certificate',
+                    resource_id=domain,
+                    error_message=str(e),
+                    user='system'
+                )
             raise
         finally:
             domain_lock.release()
@@ -657,6 +682,13 @@ class CertificateManager:
                         logger.warning(f"Failed to update metadata for {domain}: {e}")
 
                 logger.info(f"Certificate renewed successfully for {domain}")
+
+                if self.audit_logger:
+                    self.audit_logger.log_certificate_renewed(
+                        identifier=domain,
+                        user='system'
+                    )
+
                 return {
                     'success': True,
                     'domain': domain,
@@ -665,11 +697,31 @@ class CertificateManager:
             else:
                 error_msg = result.stderr or "Certificate not found"
                 logger.error(f"Certificate renewal failed for {domain}: {error_msg}")
+
+                if self.audit_logger:
+                    self.audit_logger.log_error(
+                        operation='renew',
+                        resource_type='certificate',
+                        resource_id=domain,
+                        error_message=error_msg,
+                        user='system'
+                    )
+
                 raise RuntimeError(f"Renewal failed: {error_msg}")
 
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Exception during certificate renewal for {domain}: {error_msg}")
+
+            if self.audit_logger:
+                self.audit_logger.log_error(
+                    operation='renew',
+                    resource_type='certificate',
+                    resource_id=domain,
+                    error_message=error_msg,
+                    user='system'
+                )
+
             raise RuntimeError(f"Exception: {error_msg}")
         finally:
             domain_lock.release()

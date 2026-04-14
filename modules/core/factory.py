@@ -146,17 +146,18 @@ def initialize_managers(container: AppContainer, app):
 
     shell_executor = ShellExecutor()
 
+    audit_dir = container.logs_dir / "audit"
+    audit_logger = AuditLogger(audit_dir)
+
     certificate_manager = CertificateManager(
         cert_dir=container.cert_dir,
         settings_manager=settings_manager,
         dns_manager=dns_manager,
         storage_manager=storage_manager,
         ca_manager=ca_manager,
-        shell_executor=shell_executor
+        shell_executor=shell_executor,
+        audit_logger=audit_logger
     )
-
-    audit_dir = container.logs_dir / "audit"
-    audit_logger = AuditLogger(audit_dir)
 
     rate_limit_config = RateLimitConfig()
     rate_limiter = SimpleRateLimiter(rate_limit_config)

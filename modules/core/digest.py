@@ -110,9 +110,9 @@ class WeeklyDigest:
             status = entry.get('status', '')
             if status == 'failure':
                 failed += 1
-            elif op in ('certificate_create', 'certificate_created'):
+            elif op in ('create', 'certificate_create', 'certificate_created'):
                 created += 1
-            elif op in ('certificate_renew', 'certificate_renewed'):
+            elif op in ('renew', 'certificate_renew', 'certificate_renewed'):
                 renewed += 1
 
         return {'created': created, 'renewed': renewed, 'failed': failed}
