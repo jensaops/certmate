@@ -14,7 +14,7 @@ from .utils import (
     create_powerdns_config, create_digitalocean_config, create_linode_config,
     create_gandi_config, create_ovh_config, create_namecheap_config,
     create_arvancloud_config, create_infomaniak_config, create_acme_dns_config,
-    create_multi_provider_config, _create_config_file
+    create_abion_config, create_multi_provider_config, _create_config_file
 )
 
 logger = logging.getLogger(__name__)
@@ -341,6 +341,35 @@ class AcmeDNSStrategy(DNSProviderStrategy):
                 f"from _acme-challenge.<domain> to _acme-challenge.{domain_alias} exists."
             )
 
+class AbionStrategy(DNSProviderStrategy):
+    """DNS strategy for Abion / Ports Management (api.abion.com)."""
+
+    def create_config_file(self, config_data: Dict[str, Any]) -> Optional[Path]:
+        return create_abion_config(
+            api_key=config_data.get('api_key', ''),
+            api_url=config_data.get('api_url', 'https://api.abion.com/'),
+            account_id=config_data.get('account_id', ''),
+        )
+
+    @property
+    def plugin_name(self) -> str:
+        return 'dns-abion'
+
+    @property
+    def default_propagation_seconds(self) -> int:
+        return 60
+
+    def configure_certbot_arguments(self, cmd: list, credentials_file: Optional[Path], domain_alias: Optional[str] = None) -> None:
+        cmd.extend(['--authenticator', 'dns-abion'])
+        if credentials_file:
+            cmd.extend(['--dns-abion-credentials', str(credentials_file)])
+        if domain_alias:
+            logger.info(
+                f"DNS alias '{domain_alias}' requested for Abion — ensure a CNAME "
+                f"from _acme-challenge.<domain> to _acme-challenge.{domain_alias} exists."
+            )
+
+
 class GenericMultiProviderStrategy(DNSProviderStrategy):
     def __init__(self, provider_name: str):
         self.provider_name = provider_name
@@ -398,6 +427,7 @@ class DNSStrategyFactory:
         'arvancloud': ArvanCloudStrategy,
         'infomaniak': InfomaniakStrategy,
         'acme-dns': AcmeDNSStrategy,
+        'abion': AbionStrategy,
         'http-01': HTTP01Strategy,
     }
     

@@ -36,6 +36,7 @@ certbot-dns-porkbun==0.11.0
 certbot-dns-godaddy==2.8.0
 certbot-dns-arvancloud==0.1.0
 certbot-acme-dns==0.3.1
+certbot-dns-abion==0.2.0
 
 # Cloud SDK dependencies
 boto3==1.34.144                    # AWS support

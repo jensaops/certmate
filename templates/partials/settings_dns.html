@@ -44,7 +44,7 @@
                                 Multi-Account Support
                                 <span class="ml-2 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded-full">Advanced</span>
                             </h4>
-                            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2 mb-4" role="radiogroup" aria-labelledby="dns-provider-label">
+                            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 mb-4" role="radiogroup" aria-labelledby="dns-provider-label">
                                 <label class="relative">
                                     <input type="radio" name="dns_provider" value="cloudflare" class="sr-only peer">
                                     <div class="p-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer transition-all peer-checked:border-primary peer-checked:bg-blue-50 dark:bg-blue-900/20 dark:peer-checked:bg-blue-900/30 hover:border-gray-300 dark:hover:border-gray-500">
@@ -146,6 +146,21 @@
                                             <div class="text-xs text-blue-600 dark:text-blue-400 mt-1 hidden" id="rfc2136-accounts">
                                                 <i class="fas fa-users text-xs mr-1"></i>
                                                 <span id="rfc2136-account-count">0</span> accounts
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="relative">
+                                    <input type="radio" name="dns_provider" value="abion" class="sr-only peer">
+                                    <div class="p-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer transition-all peer-checked:border-primary peer-checked:bg-blue-50 dark:bg-blue-900/20 dark:peer-checked:bg-blue-900/30 hover:border-gray-300 dark:hover:border-gray-500">
+                                        <div class="text-center">
+                                            <i class="fas fa-shield-alt text-lg text-blue-700 mb-1"></i>
+                                            <div class="text-xs font-medium dark:text-white">Abion</div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1" id="abion-status">Not configured</div>
+                                            <!-- Multi-account indicator -->
+                                            <div class="text-xs text-blue-600 dark:text-blue-400 mt-1 hidden" id="abion-accounts">
+                                                <i class="fas fa-users text-xs mr-1"></i>
+                                                <span id="abion-account-count">0</span> accounts
                                             </div>
                                         </div>
                                     </div>
@@ -975,6 +990,57 @@
                             </p>
                         </div>
                     </div>
+                    <!-- Abion Configuration -->
+                    <div id="abion-config" class="dns-config hidden">
+                        <div class="border border-orange-200 dark:border-orange-600 rounded-lg p-4 bg-orange-50 dark:bg-orange-900/20">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white">
+                                    <i class="fas fa-shield-alt mr-2 text-blue-700"></i>
+                                    Abion (Ports Management) Configuration
+                                </h4>
+                                <button type="button" id="abion-add-account" onclick="showAddAccountModal('abion')"
+                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    <i class="fas fa-plus mr-1"></i>
+                                    Add Account
+                                </button>
+                            </div>
+
+                            <!-- Account Management List -->
+                            <div id="abion-accounts-list" class="space-y-3 mb-4">
+                                <!-- Accounts will be populated here -->
+                            </div>
+
+                            <!-- Legacy single account fields (hidden when multi-account mode is active) -->
+                            <div id="abion-legacy-config">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="abion_api_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            API Key
+                                        </label>
+                                        <input type="password" id="abion_api_key" name="abion_api_key"
+                                               class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
+                                               placeholder="Your Abion API key"
+                                               autocomplete="new-password"
+                                               spellcheck="false"
+                                               data-lpignore="true">
+                                    </div>
+                                    <div>
+                                        <label for="abion_api_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            API URL <span class="text-gray-400 font-normal">(optional)</span>
+                                        </label>
+                                        <input type="url" id="abion_api_url" name="abion_api_url"
+                                               class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
+                                               placeholder="https://api.abion.com/"
+                                               value="https://api.abion.com/">
+                                    </div>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                    Generate an API key from the <a href="https://portal.abion.com/" target="_blank" class="text-primary hover:underline">Abion / Ports Management portal</a>. Leave the API URL as default unless you use the demo environment.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     </div><!-- /tab: dns -->
 
                     

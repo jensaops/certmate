@@ -962,26 +962,26 @@
     var providerAccounts = {};
 
     function loadProviderAccounts() {
-        var providers = ['cloudflare', 'route53', 'digitalocean', 'azure', 'google', 'powerdns', 'rfc2136'];
-
-        providers.forEach(function (provider) {
-            fetch('/api/settings/dns-providers/' + provider + '/accounts', {
-                headers: API_HEADERS
-            }).then(function (response) {
-                if (response.ok) {
-                    return response.json().then(function (data) {
-                        var accounts = data.accounts || {};
-                        var accountsArray = Object.keys(accounts).map(function (accountId) {
-                            var account = accounts[accountId];
-                            account.account_id = accountId;
-                            return account;
-                        });
-                        providerAccounts[provider] = accountsArray;
+        fetch('/api/web/settings/accounts', {
+            credentials: 'same-origin'
+        }).then(function (response) {
+            if (response.ok) {
+                return response.json().then(function (data) {
+                    // Group accounts by provider
+                    providerAccounts = {};
+                    data.forEach(function (account) {
+                        var provider = account.provider;
+                        if (!providerAccounts[provider]) {
+                            providerAccounts[provider] = [];
+                        }
+                        if (account.configured) {
+                            providerAccounts[provider].push(account);
+                        }
                     });
-                }
-            }).catch(function () {
-                providerAccounts[provider] = [];
-            });
+                });
+            }
+        }).catch(function () {
+            providerAccounts = {};
         });
     }
 

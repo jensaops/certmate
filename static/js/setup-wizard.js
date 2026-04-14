@@ -21,7 +21,8 @@
         vultr:         { label: 'Vultr', icon: 'fa-cloud', fields: [{ key: 'api_key', label: 'API Key', type: 'password' }] },
         ovh:           { label: 'OVH', icon: 'fa-globe', fields: [{ key: 'endpoint', label: 'Endpoint', type: 'text', placeholder: 'ovh-eu' }, { key: 'application_key', label: 'Application Key', type: 'text' }, { key: 'application_secret', label: 'Application Secret', type: 'password' }, { key: 'consumer_key', label: 'Consumer Key', type: 'password' }] },
         azure:         { label: 'Azure DNS', icon: 'fa-microsoft', fields: [{ key: 'subscription_id', label: 'Subscription ID', type: 'text' }, { key: 'resource_group', label: 'Resource Group', type: 'text' }, { key: 'tenant_id', label: 'Tenant ID', type: 'text' }, { key: 'client_id', label: 'Client ID', type: 'text' }, { key: 'client_secret', label: 'Client Secret', type: 'password' }] },
-        google:        { label: 'Google Cloud DNS', icon: 'fa-google', fields: [{ key: 'project_id', label: 'Project ID', type: 'text' }, { key: 'service_account_key', label: 'Service Account Key (JSON)', type: 'textarea' }] }
+        google:        { label: 'Google Cloud DNS', icon: 'fa-google', fields: [{ key: 'project_id', label: 'Project ID', type: 'text' }, { key: 'service_account_key', label: 'Service Account Key (JSON)', type: 'textarea' }] },
+        abion:         { label: 'Abion', icon: 'fa-shield-alt', fields: [{ key: 'api_key', label: 'API Key', type: 'password' }, { key: 'api_url', label: 'API URL', type: 'text', placeholder: 'https://api.abion.com/' }] }
     };
 
     var state = { step: 1, email: '', provider: '', credentials: {} };

@@ -456,34 +456,40 @@
             }
 
             // Add legacy DNS provider configurations from form fields
-            var legacyConfig = {};
-
-            // Get legacy fields for the selected provider
-            var provider = settings.dns_provider;
-            var legacyFields = getLegacyFieldsForProvider(provider);
-
-            legacyFields.forEach(function (fieldName) {
-                var value = formData.get(fieldName);
-                if (value && value.trim()) {
-                    var configKey = fieldName.replace(provider + '_', '');
-                    legacyConfig[configKey] = value.trim();
-                }
+            // Collect for ALL providers that have filled fields, not just the selected default
+            var allLegacyProviders = Object.keys({
+                'cloudflare': 1, 'route53': 1, 'azure': 1, 'google': 1, 'powerdns': 1,
+                'digitalocean': 1, 'linode': 1, 'gandi': 1, 'ovh': 1, 'namecheap': 1,
+                'rfc2136': 1, 'hetzner': 1, 'porkbun': 1, 'godaddy': 1, 'he-ddns': 1,
+                'dynudns': 1, 'dnsmadeeasy': 1, 'nsone': 1, 'abion': 1
             });
 
-            // Only include legacy config if we have some values and no multi-account data
-            if (Object.keys(legacyConfig).length > 0) {
-                if (!settings.dns_providers) settings.dns_providers = {};
-                if (!settings.dns_providers[provider]) settings.dns_providers[provider] = {};
+            allLegacyProviders.forEach(function (provider) {
+                var legacyConfig = {};
+                var legacyFields = getLegacyFieldsForProvider(provider);
 
-                // Check if we already have multi-account data
-                var hasMultiAccount = Object.values(settings.dns_providers[provider]).some(function (val) {
-                    return typeof val === 'object' && val.name;
+                legacyFields.forEach(function (fieldName) {
+                    var value = formData.get(fieldName);
+                    if (value && value.trim()) {
+                        var configKey = fieldName.replace(provider + '_', '')
+                                                  .replace(/-/g, '_');
+                        legacyConfig[configKey] = value.trim();
+                    }
                 });
 
-                if (!hasMultiAccount) {
-                    Object.assign(settings.dns_providers[provider], legacyConfig);
+                if (Object.keys(legacyConfig).length > 0) {
+                    if (!settings.dns_providers) settings.dns_providers = {};
+                    if (!settings.dns_providers[provider]) settings.dns_providers[provider] = {};
+
+                    var hasMultiAccount = Object.values(settings.dns_providers[provider]).some(function (val) {
+                        return typeof val === 'object' && val.name;
+                    });
+
+                    if (!hasMultiAccount) {
+                        Object.assign(settings.dns_providers[provider], legacyConfig);
+                    }
                 }
-            }
+            });
 
             addDebugLog('Settings to save: ' + JSON.stringify(settings, null, 2), 'info');
 
@@ -555,7 +561,8 @@
             'he-ddns': ['he_ddns_username', 'he_ddns_password'],
             'dynudns': ['dynudns_token'],
             'dnsmadeeasy': ['dnsmadeeasy_api_key', 'dnsmadeeasy_secret_key'],
-            'nsone': ['nsone_api_key']
+            'nsone': ['nsone_api_key'],
+            'abion': ['abion_api_key', 'abion_api_url']
         };
 
         return fieldMappings[provider] || [];
@@ -748,7 +755,7 @@
             'cloudflare', 'route53', 'azure', 'google', 'powerdns',
             'digitalocean', 'linode', 'gandi', 'ovh', 'namecheap',
             'vultr', 'dnsmadeeasy', 'nsone', 'rfc2136', 'hetzner',
-            'porkbun', 'godaddy', 'he-ddns', 'dynudns'
+            'porkbun', 'godaddy', 'he-ddns', 'dynudns', 'abion'
         ];
 
         providers.forEach(function (provider) {
@@ -932,6 +939,10 @@
                 'powerdns': [
                     { field: 'powerdns_api_url', config: 'api_url' },
                     { field: 'powerdns_api_key', config: 'api_key' }
+                ],
+                'abion': [
+                    { field: 'abion_api_key', config: 'api_key' },
+                    { field: 'abion_api_url', config: 'api_url' }
                 ]
             };
 
@@ -986,7 +997,8 @@
             'he-ddns': 'Hurricane Electric',
             'dynudns': 'Dynu',
             'dnsmadeeasy': 'DNS Made Easy',
-            'nsone': 'NS1'
+            'nsone': 'NS1',
+            'abion': 'Abion'
         };
         modalTitle.textContent = 'Add ' + (providerNames[provider] || provider) + ' Account';
 
@@ -1176,6 +1188,10 @@
             ],
             'nsone': [
                 { name: 'api_token', label: 'API Token', type: 'password', placeholder: 'Your NS1 API token', required: true }
+            ],
+            'abion': [
+                { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Your Abion API key', required: true },
+                { name: 'api_url', label: 'API URL', type: 'url', placeholder: 'https://api.abion.com/', defaultValue: 'https://api.abion.com/', required: false }
             ]
         };
 
