@@ -16,7 +16,7 @@ def register_misc_routes(app, managers, require_web_auth, auth_manager):
         try:
             audit_logger = managers['audit']
             logs = audit_logger.get_recent_entries(limit=50)
-            return jsonify(logs)
+            return jsonify({'entries': logs})
         except Exception as e:
             logger.error(f"Activity API error: {e}")
             return jsonify({'error': 'Failed to fetch activity'}), 500
@@ -105,3 +105,21 @@ def register_misc_routes(app, managers, require_web_auth, auth_manager):
         except Exception as e:
             logger.error(f"Audit log fetch failed: {e}")
             return jsonify({'error': 'Failed to fetch audit logs'}), 500
+
+    @app.route('/api/events/stream')
+    @auth_manager.require_role('viewer')
+    def events_stream():
+        """Server-Sent Events stream for real-time certificate operation updates."""
+        event_bus = managers.get('events')
+        if not event_bus:
+            return jsonify({'error': 'Event bus not available'}), 503
+
+        q = event_bus.subscribe()
+        return Response(
+            stream_with_context(event_bus.stream(q)),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',  # Disable nginx buffering for SSE
+            }
+        )
