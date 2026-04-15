@@ -203,3 +203,38 @@ def register_cert_routes(app, managers, require_web_auth, auth_manager,
         except Exception as e:
             logger.error(f"Certificate renewal failed via web: {str(e)}")
             return jsonify({'error': 'Certificate renewal failed'}), 500
+
+    @app.route('/api/web/certificates/<string:domain>', methods=['DELETE'])
+    @auth_manager.require_role('operator')
+    def delete_certificate_web(domain):
+        """Delete certificate via web"""
+        try:
+            cert_dir, error = _sanitize_domain(domain, file_ops.cert_dir)
+            if error:
+                return jsonify({'error': error}), 400
+
+            domain_name = cert_dir.name
+            deleted = certificate_manager.delete_certificate(domain_name)
+            if deleted:
+                logger.info(f"Certificate deleted for {domain_name}")
+
+                # Also remove domain from settings.json
+                try:
+                    settings = settings_manager.load_settings()
+                    domains = settings.get('domains', [])
+                    settings['domains'] = [
+                        d for d in domains
+                        if (d if isinstance(d, str) else d.get('domain')) != domain_name
+                    ]
+                    settings_manager.save_settings(settings)
+                    logger.info(f"Removed {domain_name} from settings")
+                except Exception as e:
+                    logger.warning(f"Failed to remove {domain_name} from settings: {e}")
+
+                return jsonify({'message': f'Certificate for {domain_name} deleted successfully'})
+            return jsonify({'error': 'Certificate not found'}), 404
+        except RuntimeError as e:
+            return jsonify({'error': str(e)}), 409
+        except Exception as e:
+            logger.error(f"Certificate deletion failed via web: {str(e)}")
+            return jsonify({'error': 'Certificate deletion failed'}), 500
