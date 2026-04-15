@@ -234,7 +234,7 @@ def register_settings_routes(app, managers, require_web_auth, auth_manager,
         try:
             data = request.json
             if deploy_manager.save_config(data):
-                return jsonify({'message': 'Deploy configuration saved'})
+                return jsonify({'status': 'saved'})
             return jsonify({'error': 'Invalid configuration or save failed'}), 400
         except Exception as e:
             logger.error(f"Failed to save deploy config: {e}")
@@ -252,7 +252,7 @@ def register_settings_routes(app, managers, require_web_auth, auth_manager,
             domain = data.get('domain', 'test.example.com')
             result = deploy_manager.test_hook(hook_id, domain=domain)
             if 'error' in result:
-                return jsonify(result), 404
+                return jsonify(result)
             return jsonify(result)
         except Exception as e:
             logger.error(f"Failed to test deploy hook {hook_id}: {e}")

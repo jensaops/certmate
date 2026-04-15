@@ -123,3 +123,56 @@ def register_misc_routes(app, managers, require_web_auth, auth_manager):
                 'X-Accel-Buffering': 'no',  # Disable nginx buffering for SSE
             }
         )
+
+    @app.route('/api/notifications/config', methods=['GET', 'POST'])
+    @auth_manager.require_role('admin')
+    def notifications_config():
+        """Get or save notification settings."""
+        try:
+            settings_manager = managers['settings']
+            if request.method == 'GET':
+                settings = settings_manager.load_settings()
+                return jsonify(settings.get('notifications', {}))
+            else:
+                data = request.json or {}
+                settings = settings_manager.load_settings()
+                settings['notifications'] = data
+                settings_manager.save_settings(settings)
+                return jsonify({'success': True})
+        except Exception as e:
+            logger.error(f"Notification config error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/notifications/test', methods=['POST'])
+    @auth_manager.require_role('admin')
+    def notifications_test():
+        """Send a test notification via the specified channel."""
+        try:
+            notifier = managers.get('notifier')
+            if not notifier:
+                return jsonify({'error': 'Notifier not available'}), 503
+
+            notifier.notify(
+                event='test',
+                title='CertMate Test Notification',
+                message='This is a test notification from CertMate.',
+                details={}
+            )
+            return jsonify({'success': True})
+        except Exception as e:
+            logger.error(f"Notification test error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/digest/send', methods=['POST'])
+    @auth_manager.require_role('admin')
+    def digest_send():
+        """Trigger an immediate weekly digest email."""
+        try:
+            digest = managers.get('digest')
+            if not digest:
+                return jsonify({'error': 'Digest not available'}), 503
+            result = digest.send()
+            return jsonify(result)
+        except Exception as e:
+            logger.error(f"Digest send error: {e}")
+            return jsonify({'error': str(e)}), 500
