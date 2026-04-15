@@ -421,7 +421,7 @@
                 '<button type="button" data-action="renew" data-domain="' + safeDomain + '" onclick="event.stopPropagation()" class="p-1.5 text-gray-400 hover:text-green-600 dark:hover:text-green-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Renew"><i class="fas fa-sync-alt"></i></button>' +
                 '<button type="button" data-action="download" data-domain="' + safeDomain + '" onclick="event.stopPropagation()" class="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Download"><i class="fas fa-download"></i></button>' +
                 '<button type="button" data-action="curl" data-domain="' + safeDomain + '" onclick="event.stopPropagation()" class="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="API"><i class="fas fa-code"></i></button>' +
-                '<button type="button" data-action="delete" data-domain="' + safeDomain + '" onclick="event.stopPropagation()" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Delete"><i class="fas fa-trash-alt"></i></button>' +
+                (canDelete() ? '<button type="button" data-action="delete" data-domain="' + safeDomain + '" onclick="event.stopPropagation()" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Delete"><i class="fas fa-trash-alt"></i></button>' : '') +
                 '</div>' +
                 '</td>' +
                 '</tr>';
@@ -504,7 +504,7 @@
                 '<button type="button" onclick="renewCertificate(\'' + safeDomain + '\')" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><i class="fas fa-sync-alt mr-2 text-green-600"></i>Renew Certificate</button>' +
                 '<button type="button" onclick="downloadCertificate(\'' + safeDomain + '\')" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><i class="fas fa-download mr-2 text-blue-600"></i>Download Certificate</button>' +
                 '<button type="button" onclick="copyCurlCommand(\'' + safeDomain + '\')" class="w-full inline-flex items-center justify-center px-4 py-2 border border-blue-300 dark:border-blue-600 shadow-sm text-sm font-medium rounded-md text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50"><i class="fas fa-code mr-2"></i>Show API Command</button>' +
-                '<button type="button" onclick="deleteCertificate(\'' + safeDomain + '\')" class="w-full inline-flex items-center justify-center px-4 py-2 border border-red-300 dark:border-red-600 shadow-sm text-sm font-medium rounded-md text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50"><i class="fas fa-trash-alt mr-2"></i>Delete Certificate</button>' +
+                (canDelete() ? '<button type="button" onclick="deleteCertificate(\'' + safeDomain + '\')" class="w-full inline-flex items-center justify-center px-4 py-2 border border-red-300 dark:border-red-600 shadow-sm text-sm font-medium rounded-md text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50"><i class="fas fa-trash-alt mr-2"></i>Delete Certificate</button>' : '') +
                 '<button type="button" onclick="checkDeploymentStatus(\'' + safeDomain + '\')" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"><i class="fas fa-globe mr-2 text-indigo-600"></i>Check Deployment</button>' +
                 '</div>' +
                 '</div>' +
@@ -1312,7 +1312,26 @@
     }
 
     // Initialize on page load
+    // Current user role — fetched once on load, used to show/hide privileged actions
+    var currentUserRole = 'viewer';
+
+    function loadCurrentUserRole() {
+        fetch('/api/auth/me', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.user && data.user.role) {
+                    currentUserRole = data.user.role;
+                }
+            })
+            .catch(function () {});
+    }
+
+    function canDelete() {
+        return currentUserRole === 'operator' || currentUserRole === 'admin';
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
+        loadCurrentUserRole();
         loadCertificates();
         loadProviderAccounts();
 
